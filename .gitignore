@@ -1,0 +1,30 @@
+# ---- 编译产物 ----
+*.o
+*.obj
+*.exe
+*.out
+*.so
+*.a
+*.dll
+*.cu.o
+*.cubin
+*.ptx
+
+# ---- CMake / 构建 ----
+build/
+cmake-build-*/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- 日志 / 临时 ----
+*.log
