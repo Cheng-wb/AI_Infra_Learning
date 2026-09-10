@@ -19,7 +19,7 @@ g++ --version      # 应看到 GCC 版本
 ## 任务清单
 
 ### 任务 1：第一个 C++ 程序
-1. 新建目录 `Month_1_CUDA基础/Week_1/`，写 `hello.cpp`：
+1. 新建目录 `Month_01_CUDA基础/Week_1/`，写 `hello.cpp`：
 
 ```cpp
 #include <iostream>
