@@ -1,237 +1,255 @@
-# AI Infra 算子开发工程师 · 12 个月学习计划（6 个月主线 + 6 个月冲刺）
+# 2026 AI Kernel / AI Systems Engineer · 12 个月学习计划
 
-> **目标岗位：** NVIDIA 算子开发工程师（CUDA Kernel / Operator Development）
-> **阶段划分：**
-> - **第 6 个月 checkpoint：** 具备「可投第一份 AI Infra / 算子岗」的能力与作品集。
-> - **第 12 个月最终：** 对标 NVIDIA 正式算子岗，能独立分析算子瓶颈、写出「正确 + 高性能 + 可接入 PyTorch」的 CUDA 算子，并用 Roofline / Nsight 讲清「为什么快 / 为什么慢」。
-> **学习节奏：** 每天 4 小时；**运行环境：** AutoDL 租用 RTX 4090（Ada / sm_89，24GB），按需租 A100/H100 测 Hopper 特性。
-> **当前身份：** 在职 → 背书主攻「**开源贡献 + 技术博客 + 项目作品集 + 社招内推**」，不依赖实习 / 学生竞赛。
-
----
-
-## 一、这个岗位到底要什么（JD 拆解）
-
-NVIDIA 算子开发工程师（算子方向）日常工作本质是：**把深度学习框架里的一个算子（GEMM、卷积、Softmax、LayerNorm、Attention、量化、通信…），写成在目标 GPU 上又快又正确的 CUDA Kernel，并接入 PyTorch/TensorFlow，用 Nsight 验证性能。**
-
-把它拆成可学习、可考核的能力项：
-
-| # | 能力项 | 对应月份 | 验收方式 |
-| --- | --- | --- | --- |
-| 1 | C++ 编程（指针/模板/STL/内存/编译） | M1 | 用 C++ 独立实现数据结构 + 单测 |
-| 2 | CUDA 编程模型（线程/Block/Grid/内存层次） | M1 | 手写并验证向量加法等基础 kernel |
-| 3 | GPU 架构（SM/Warp/Tensor Core/带宽） | M1–M4 | 能画出内存层次图、解释 warp 调度 |
-| 4 | 内存优化（合并访问/Bank Conflict/共享内存/Tiling） | M2–M3 | 归约/转置/GEMM 达到性能目标 |
-| 5 | 并行原语（Reduction/Scan/Transpose） | M2 | 三件套 kernel 通过 CPU 对拍 |
-| 6 | GEMM 与矩阵运算 | M3 | tiled GEMM 达到 cuBLAS 同量级 |
-| 7 | Tensor Core 编程 + CUTLASS | M4 | WMMA/CUTLASS GEMM 跑通并提速 |
-| 8 | 框架集成（PyTorch 自定义算子/Triton） | M5 | 算子可训练、可反向传播 |
-| 9 | 性能分析（Roofline/Nsight Compute/Systems） | M3–M6 | 能定位并消除一个真实瓶颈 |
-| 10 | 现代架构（Hopper TMA/wgmma/CUDA Graph） | M7 | 概念 + 代码结构 + A100/H100 实测 |
-| 11 | 系统与编译器（PTX/SASS/nvcc/数值精度） | M9 | 能读 SASS、解释精度差异 |
-| 12 | 分布式算子（NCCL/all-reduce/通信隐藏） | M9 | 理解通信算子与计算重叠 |
-| 13 | 开源工程能力（贡献 PR/读大型代码库） | M6–M11 | 累计 3–5 个 merged PR |
-| 14 | 面试能力（八股/刷题/算子案例/系统设计） | M10–M11 | 模拟面试通过、拿到 offer |
-
-> **一句话定位：** 这不是「会写 Python/调 API」，而是「会写贴近硬件的 CUDA C++，并理解每一行代码在 GPU 上如何执行」。前 6 个月打地基 + 出作品，后 6 个月冲高度 + 出背书。
+> **版本日期：2026-09-11**
+> **目标岗位：** AI Kernel Engineer / GPU Performance Engineer / AI Systems Engineer / Inference Systems Engineer
+> **建议投入：** 每天约 4 小时，每周 7 天中 Day 7 以 benchmark、复盘、文档、PR 为主
+> **主环境：** NVIDIA RTX 4090（Ada / sm_89）可覆盖大部分 CUDA、Triton、cuTile 基础实验；按需租 H100/H200/B200/GB200 做 Hopper/Blackwell 与多卡实验
+> **学习原则：** 不以「看完」为完成标准，只认 **correctness + benchmark + profiler evidence + reproducibility + code review**。
 
 ---
 
-## 二、学习路线图
+## 仓库结构
+
+本仓库同时承载「学习计划」与「代码项目」两部分：
+
+- `Month_01` … `Month_12`：**学习计划**。每个月份文件夹内是本月的逐周、逐日任务表与验收标准（详见各 `README.md`）。
+- `kernels/` `operators/` `compiler_lab/` `runtime/` `distributed/` `benchmarks/` `profiling/` `tests/` `docs/`：**代码项目结构**（见下方第 5 节），所有实验代码、benchmark、文档按此落盘。
+
+---
+
+## 0. 这份路线和传统 CUDA 路线有什么不同
+
+这不是单纯的 CUDA Kernel 学习表，而是按 2026 年 AI Infra 的真实工作栈组织：
+
+1. **Kernel：** CUDA C++、内存层次、并行原语、GEMM、Tensor Core、Attention、量化、MoE。
+2. **Kernel DSL：** Triton、CuTe/CUTLASS DSL、cuTile Python。
+3. **Framework / Compiler：** PyTorch custom op、`torch.library`、`torch.compile`、Inductor、IR、PTX/SASS、基础 MLIR/LLVM 思维。
+4. **Inference Runtime：** KV Cache、PagedAttention、continuous batching、chunked prefill、prefix caching、CUDA Graph、sampling、speculative decoding。
+5. **Distributed：** NCCL、ReduceScatter/AllGather/AllToAll、TP/DP/PP/EP/CP、NVLink/NVSwitch、InfiniBand/RoCE、NVSHMEM。
+6. **Production：** TTFT/TPOT/throughput、调度、可观测性、容量规划、故障与 OOM、性能回归。
+7. **工程背书：** benchmark、profiling report、技术博客、开源 PR、明星项目、面试与投递。
+
+### 12 个月结束时应达到的能力
+
+- 能从算子数学定义推导并行分解、数据布局、算术强度和瓶颈。
+- 能在 CUDA / Triton / CuTe DSL / cuTile 中至少熟练两种、理解另外两种。
+- 能写 PyTorch 可组合 custom op，并兼容 `torch.compile`。
+- 能读 PTX/SASS/IR，用 Nsight Compute / Systems 给出优化证据。
+- 能解释并实现简化的 KV Cache / PagedAttention / continuous batching runtime。
+- 能理解并实测 NCCL collectives、TP/EP 与通信计算重叠；了解 NVSHMEM GPU-initiated communication。
+- 能对 vLLM / CUTLASS / PyTorch / Triton / FlashInfer / SGLang 等至少一个大型项目进行源码级分析并完成有效贡献。
+
+---
+
+## 1. 每天 4 小时的固定模板
+
+| 时间 | 内容 |
+|---|---|
+| 40 min | 官方文档 / 论文 / 源码精读，写 5–10 条结论 |
+| 2 h | 编码：reference → kernel/runtime → tests |
+| 40 min | benchmark / profiler / 参数扫描 |
+| 40 min | 复盘：性能数字、失败原因、下一步、commit |
+
+### Day 7 固定规则
+
+Day 7 不追新知识，优先做四件事：**清测试、跑统一 benchmark、写 profiling 结论、整理 README/博客/PR**。如果本周主任务没完成，Day 7 先补主任务，不为了赶日历跳过关键能力。
+
+---
+
+## 2. Benchmark 与验收规范
+
+以后所有「快了多少」都按统一口径记录，避免出现「GEMM 达到 cuBLAS 80%」但无法复现的问题。
+
+- 固定记录：GPU、driver、CUDA、PyTorch、compiler flags、dtype、layout、shape、batch、warmup、迭代次数。
+- correctness：至少与 PyTorch/cuBLAS/reference 对拍；低精度明确 `atol/rtol`；训练算子补 `gradcheck` 或对应梯度验证。
+- latency：CUDA Event 或框架官方 benchmark 工具；必须 warmup；同步位置正确；报告 median/p50，必要时加 p95。
+- throughput：GEMM 用 TFLOP/s；memory-bound kernel 用 effective bandwidth；serving 用 req/s、tok/s、TTFT、TPOT/ITL。
+- profiler：至少给出一个「优化前 → 指标 → 推断 → 修改 → 优化后」的闭环。
+- baseline：不要只比自己的 naive；应根据任务选择 cuBLAS/CUTLASS、PyTorch eager/SDPA、Triton、vLLM 等工业 baseline。
+- 性能目标按 shape 划分，而不是设一个全局百分比。例如 GEMM 至少测小矩阵、方阵、LLM 常见 skinny/fat shape。
+
+---
+
+## 3. 12 个月总览
+
+| 月份 | 主线 | 核心交付 |
+|---|---|---|
+| M1 | C++ / CUDA / GPU 基础 | P1 基础 kernel + benchmark 框架 |
+| M2 | 并行原语 / GEMM / Roofline | P2 CUDA GEMM 优化报告 |
+| M3 | Tensor Core / CUTLASS / CuTe | P3 多层次 GEMM + CuTe/CUTLASS 笔记 |
+| M4 | DL 核心算子 / Triton / FlashAttention | P4 LLM kernel pack |
+| M5 | PyTorch 集成 / torch.compile / Compiler | P5 compile-friendly custom-op library + mini compiler |
+| M6 | KV Cache / PagedAttention / Scheduler | P6 Mini LLM Inference Runtime v1；开始试投 |
+| M7 | FP8/INT8/FP4 / cuTile / Blackwell | 低精度 kernel pack + 现代架构报告 |
+| M8 | MoE / Sampling / Speculative / 开源 | MoE mini-engine + 第一个有技术含量的 PR |
+| M9 | NCCL / TP/EP / NVSHMEM | Multi-GPU Transformer Block |
+| M10 | vLLM / Production Inference | P7 Production Inference Performance Report |
+| M11 | 开源深挖 / 专项强化 | 1 个深度 PR + Capstone v2 |
+| M12 | Capstone / 面试 / 正式投递 | 最终作品集 + 面试就绪 |
+
+> 每个月份的逐周、逐日任务与验收标准，见对应 `Month_NN_*` 文件夹的 `README.md`。
+
+---
+
+## 4. 最终验收清单
+
+### Kernel
+
+- [ ] 不看模板写出 elementwise / transpose / reduction / softmax 基础 CUDA kernel。
+- [ ] 能写并解释 tiled GEMM、register tiling、vectorization、async pipeline。
+- [ ] 能解释 Tensor Core、TMA、Thread Block Cluster，以及 Hopper/Blackwell 差异。
+- [ ] 至少熟练 CUDA + Triton/CuTe/cuTile 中另一套 DSL。
+- [ ] 有 LLM kernel：RMSNorm、RoPE、Attention/FlashAttention、低精度或 MoE 中至少 4 类。
+
+### Compiler / Framework
+
+- [ ] 会用 `torch.library` 注册 custom op，做 opcheck/autograd。
+- [ ] custom op 能与 `torch.compile` 正确组合。
+- [ ] 能解释 Dynamo → AOTAutograd → Inductor 的基本链路。
+- [ ] 能读 FX/Triton IR/PTX/SASS，并从编译产物定位一个性能问题。
+- [ ] 做过至少一个 toy IR pass / fusion / codegen 项目。
+
+### Runtime
+
+- [ ] 能解释 prefill/decode 的性能差异。
+- [ ] 写过 KV Cache manager 和简化 PagedAttention。
+- [ ] 写过 continuous batching scheduler。
+- [ ] 理解 chunked prefill、prefix caching、CUDA Graph、speculative decoding。
+- [ ] 会用 TTFT/TPOT/throughput/concurrency 分析 serving。
+
+### Distributed
+
+- [ ] 能讲清 NCCL ring/tree、AllReduce/AllGather/ReduceScatter/AllToAll。
+- [ ] 写过 TP Transformer block 或等价实验。
+- [ ] 理解 MoE Expert Parallel 与 AllToAll。
+- [ ] 能读 nsys timeline 判断通信/计算是否 overlap。
+- [ ] 跑过 NVSHMEM demo，理解 GPU-initiated communication 的价值。
+
+### 工程与求职
+
+- [ ] 至少 5 个可复现 benchmark 项目，其中 2 个达到 portfolio 级质量。
+- [ ] 1 个明星 Capstone：同时包含 kernel + runtime，最好再含 distributed。
+- [ ] 至少 1 个真实开源技术 PR；以质量和 review 深度为 KPI，不把 merge 当唯一 KPI。
+- [ ] 6–10 篇高质量技术笔记/博客，不追数量灌水。
+- [ ] 每个简历性能数字都能回答：硬件？shape？dtype？baseline？计时方法？为什么快？
+
+---
+
+## 5. 推荐项目结构
 
 ```text
-【Phase 1 · M1–M6 · 主线：从零到「能写高性能算子 + 有作品集」】
-Month 1  C++ 与 CUDA 编程基础        → 能写/编译/验证第一个 CUDA kernel
-Month 2  内存优化与核心数据算子       → Reduction / Scan / Transpose 三件套
-Month 3  GEMM 与矩阵运算             → naive → tiled → register-tiled GEMM
-Month 4  Tensor Core 与进阶算子       → WMMA / CUTLASS / Softmax / Attention
-Month 5  框架集成与工程化             → PyTorch 自定义算子 / Triton / Flash Attention / Nsight
-Month 6  进阶整合 + 量化入门 + 首个 PR → Capstone v1 完成，开始开源贡献
-                    ───────────────────────────────
-                    checkpoint：可投第一份 AI Infra / 算子岗
-                    ───────────────────────────────
-【Phase 2 · M7–M12 · 冲刺：深挖 + 背书 + 面试】
-Month 7  现代架构与高级特性           → Hopper TMA/wgmma / CUDA Graph / async copy
-Month 8  开源深挖                     → CUTLASS 源码 / vLLM、xFormers 贡献 / FlashAttention 复现
-Month 9  系统与编译器                 → PTX/SASS / nvcc / Triton 编译 / 数值精度 / NCCL
-Month 10 面试准备                     → 八股 / 刷题 / 算子案例 / 系统设计 / 简历 + 内推
-Month 11 投递与面试实战               → 海投 / 面试 / 复盘 / 持续开源
-Month 12 收尾与决策                   → 深度项目收口 / offer 决策
+ai-kernel-systems-roadmap/
+├── kernels/
+│   ├── cuda/
+│   ├── triton/
+│   ├── cute_dsl/
+│   └── cutile/
+├── operators/
+│   ├── gemm/
+│   ├── normalization/
+│   ├── attention/
+│   ├── quantization/
+│   └── moe/
+├── compiler_lab/
+│   ├── toy_ir/
+│   └── torch_compile/
+├── runtime/
+│   ├── kv_cache/
+│   ├── paged_attention/
+│   ├── scheduler/
+│   └── mini_server/
+├── distributed/
+│   ├── nccl/
+│   ├── tensor_parallel/
+│   ├── expert_parallel/
+│   └── nvshmem/
+├── benchmarks/
+├── profiling/
+├── tests/
+├── docs/
+└── README.md
 ```
 
----
-
-## 三、贯穿 12 个月的 7 个项目（求职作品集）
-
-每个项目都是「能放进简历 + 能讲清楚」的完整闭环，均包含：CPU/朴素实现对拍 → CUDA 实现 → 性能 benchmark → 文档。
-
-| 项目 | 周期 | 内容 | 产出 |
-| --- | --- | --- | --- |
-| **P1 基础算子库** | M1–M2 | element-wise / reduction / transpose / scan + 统一校验框架 | 可复用算子库 + 单测 |
-| **P2 高性能 GEMM** | M3 | naive → shared-mem tiling → register tiling + 向量化 | 达到 cuBLAS 同量级，附性能曲线 |
-| **P3 Tensor Core 算子集** | M4 | WMMA GEMM + CUTLASS + Softmax/LayerNorm/Attention | 对比普通 GEMM 的加速比 |
-| **P4 框架集成算子** | M5 | PyTorch 自定义算子 + Triton + Flash Attention + Nsight 报告 | 可训练算子 + profiling 报告 |
-| **P5 Capstone v1 算子库** | M6 | 融合算子（fused LN+GEMM / 简化 attention）+ 量化入门 + benchmark | 完整开源库 + README |
-| **P6 明星项目** | M7–M9 | Flash Attention 2/3 复现或深度优化 + Hopper 特性 + 分布式算子 | 有分量的开源项目 + 博客 |
-| **P7 开源贡献成果** | M6–M11 | PyTorch / Triton / CUTLASS / vLLM / xFormers 的 PR | 3–5 个 merged PR |
-
-> 核心原则：**不要只学算法，持续完成「理论 → 建模 → 编码 → 实验 → benchmark」的闭环。** 每个算子都经历：CPU 参考实现（定正确性）→ GPU 实现 → 数值对拍 → 计时 → 优化 → 画性能曲线。
+> 本仓库已按此创建对应目录骨架，各目录内含占位 `README.md` 说明用途与对应月份。
 
 ---
 
-## 四、硬件与环境（AutoDL · RTX 4090）
+## 6. 2026 官方资料优先级
 
-**你在 AutoDL 租用 RTX 4090（24GB）。** 这是比 Colab T4 好得多的选择：算力约 10 倍、显存更大、数据盘持久（关机不丢环境/代码）、SSH + JupyterLab 自由、镜像自带 CUDA + PyTorch。关键参数与边界：
+以下资料应优先于二手博客。二手文章用于补直觉，不作为版本/接口/架构事实的唯一依据。
 
-| 环境 | GPU | 计算能力 sm | 能跑什么 | 不能跑什么 |
-| --- | --- | --- | --- | --- |
-| **AutoDL 4090** | RTX 4090 | sm_89（Ada） | 全部基础 CUDA、shared memory、WMMA、`cp.async`、FP8（消费级卡吞吐打折）、强 FP16/BF16/INT8 Tensor Core | 无 TMA / wgmma / Thread Block Cluster / DSMEM（Hopper sm_90 专属） |
-| 云 A100（按需租） | A100 | sm_80（Ampere） | 4090 全部 + 更强 Tensor Core、更高显存带宽 | Hopper 特性仍不行 |
-| 云 H100（按需租） | H100 | sm_90（Hopper） | 全部，含 TMA / wgmma / Thread Block Cluster | — |
+### NVIDIA CUDA / Architecture
 
-**编译 arch：** 4090 用 `-arch=sm_89`（或 `compute_89`）；用 `#if __CUDA_ARCH__ >= 900` 做 Hopper 特性条件编译，保证同一份代码在 4090 能跑、在 H100 走新路径。
+- CUDA Programming Guide: https://docs.nvidia.com/cuda/cuda-programming-guide/
+- CUDA Compute Capabilities: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/compute-capabilities.html
+- Blackwell Tuning Guide: https://docs.nvidia.com/cuda/blackwell-tuning-guide/
+- Nsight Compute: https://docs.nvidia.com/nsight-compute/
+- Nsight Systems: https://docs.nvidia.com/nsight-systems/
 
-**4090 关键数字（Roofline 会用）：** 峰值 FP32 ≈ 82.6 TFLOPS，Tensor Core FP16 ≈ 165 TFLOPS，显存带宽 ≈ 1008 GB/s（对比 T4 的 8.1 TFLOPS / 320 GB/s）。
+### CUTLASS / CuTe DSL
 
-**策略：**
-- **M1–M6 全部实验在 4090 上完成**（4090 有 Tensor Core、支持 WMMA 和 `cp.async`，够学会 Tensor Core 编程与异步拷贝）。
-- **M7 的 Hopper 特性（TMA/wgmma/cluster）** 属于「看文档 + 读源码 + 概念理解」，**仅按需租 1–2 小时 H100 做实测**，4090 不强求——但概念和代码结构一定要看懂，面试会问。
-- AutoDL 关机释放算力但**数据盘保留**；务必把代码 push 到 GitHub，避免只依赖单块数据盘。
-- 4090 无 NVLink，M9 的 NCCL 多卡 all-reduce 实测需多卡实例或只读概念，单卡学习够用。
+- CUTLASS: https://docs.nvidia.com/cutlass/latest/
+- CUTLASS Overview / CuTe DSL: https://docs.nvidia.com/cutlass/latest/overview.html
+- CuTe DSL docs: https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/cute_dsl.html
 
-**工具链：** `nvcc`（AutoDL 镜像已装）、`g++`、`CMake`、`pybind11` / `torch.utils.cpp_extension`（M5）、`triton`（M5）、`cuda-python`/`cupy`（可选）；Nsight Compute / Systems 用 `ncu`/`nsys`（M5–M6，容器内可能需 `--privileged` 权限，若无则用本地或可 root 的镜像）。
+### cuTile Python
 
----
+- cuTile Python: https://docs.nvidia.com/cuda/cutile-python/
+- Quickstart: https://docs.nvidia.com/cuda/cutile-python/quickstart.html
+- Compilation/AOT: https://docs.nvidia.com/cuda/cutile-python/compilation.html
 
-## 五、每天 4 小时怎么分配
+> 2026-09 的 cuTile 文档已覆盖 8.x、9.x、10.x、11.x、12.x GPU，且 1.6.0 发布于 2026-09-09。具体安装要求和支持矩阵应以当时官方文档为准。
 
-| 时间段 | 时长 | 内容 |
-| --- | --- | --- |
-| 理论 / 精读 | 40 min | 读当天知识点、官方文档、源码片段，记笔记 |
-| 动手编码 | 2 h | 写当天 kernel / 练习，跑通、对拍 |
-| 实验 / 对比 | 40 min | 改参数、计时、画性能曲线、与参考实现对比 |
-| 总结复盘 | 40 min | 写当日笔记（结论 + 踩坑 + 性能数字），完成自检 |
+### PyTorch
 
-> 每周第 7 天为「复习 + 综合动手 + 周笔记」；Phase 2 的第 7 天逐步转为「开源贡献 + 面试 + 简历」时间。
+- Custom Operators: https://docs.pytorch.org/docs/main/library.html
+- User-defined Triton kernels with `torch.compile`: https://docs.pytorch.org/tutorials/recipes/torch_compile_user_defined_triton_kernel_tutorial.html
+- `torch.compile`: https://docs.pytorch.org/docs/stable/torch.compiler.html
 
----
+> 现代 PyTorch custom op 优先学习 `torch.library` / `triton_op` / `register_autograd` / `opcheck`。`torch.autograd.Function` 仍值得理解，但不要把它当唯一集成方式。
 
-## 六、十二个月月度概览
+### vLLM / Serving
 
-**Phase 1（M1–M6）主线：**
+- vLLM docs: https://docs.vllm.ai/en/stable/
+- Optimization and Tuning: https://docs.vllm.ai/en/latest/configuration/optimization/
+- Data Parallel Deployment: https://docs.vllm.ai/en/latest/serving/data_parallel_deployment/
+- Expert Parallel Deployment: https://docs.vllm.ai/en/latest/serving/expert_parallel_deployment/
 
-| 月 | 主题 | 里程碑产出 |
-| --- | --- | --- |
-| M1 | C++ 与 CUDA 基础 | 第一个验证过的 kernel |
-| M2 | 内存优化与核心算子 | P1 基础算子库 |
-| M3 | GEMM 与矩阵 | P2 高性能 GEMM |
-| M4 | Tensor Core + 进阶算子 | P3 Tensor Core 算子集 |
-| M5 | 框架集成 + 工程化 | P4 可训练算子 + profiling |
-| M6 | 进阶整合 + 量化 + 首个 PR | P5 Capstone v1 + 开源起航 |
+> 当前 vLLM 已覆盖 PagedAttention、continuous batching、chunked prefill、prefix caching、CUDA Graph、torch.compile、多种低精度、speculative decoding，以及 TP/PP/DP/EP/CP。学习 runtime 时应直接以源码和官方文档为主。
 
-**Phase 2（M7–M12）冲刺：**
+### Distributed
 
-| 月 | 主题 | 里程碑产出 |
-| --- | --- | --- |
-| M7 | 现代架构与高级特性 | Hopper 特性实验 + 博客 |
-| M8 | 开源深挖 | 有分量的 PR / FlashAttention 复现 |
-| M9 | 系统与编译器 | PTX/SASS 笔记 + 数值精度 |
-| M10 | 面试准备 | 简历 + 内推启动 + 刷题 |
-| M11 | 投递与面试实战 | 面试复盘 + 持续开源 |
-| M12 | 收尾与决策 | offer 决策 / 深度项目收口 |
+- NCCL docs: https://docs.nvidia.com/deeplearning/nccl/
+- NVSHMEM: https://docs.nvidia.com/nvshmem/
+
+> NVSHMEM 的重要价值是允许从 CUDA kernel / CUDA stream 发起更细粒度 GPU-GPU 通信，适合理解 GPU-initiated communication 与通信计算融合。
 
 ---
 
-## 七、成果背书与求职路径（简历怎么过）
+## 7. 需要主动降级或延后的内容
 
-> **核心认知：** 你能进面试，靠的不是「我学过」，而是「我做出过、且能被第三方验证」。背书和理论学习**并行**，从第 1 个月就开始。你是**在职**，实习/学生竞赛不适用，所以主攻下面 L1/L2/L3/L5/L6。
+学习计划不是越满越好。遇到时间不足时，按下面顺序删减：
 
-背书的含金量从低到高排序：
-
-**L1 — GitHub 作品集项目（M1 起持续，人人可做）**
-- 把每个里程碑做成带 README、单测、benchmark 数字、性能曲线图的公开仓库。
-- 关键：**数字可复现**（给出环境、`nvidia-smi`、对比 cuBLAS/cuDNN/PyTorch 的加速比/带宽占比）。
-- 一个「我手写的 GEMM 达到 cuBLAS 88%」的 benchmark 截图，比 10 个没说清楚的 demo 值钱。
-
-**L2 — 技术博客（M2 起，沉淀个人品牌）**
-- 每完成一个里程碑写一篇深度文，讲清「原理 → 实现 → 踩坑 → 性能数字」。
-- 发在知乎 / 公众号 / 个人博客 / Medium，标题如《手写 CUDA 归约，从 40GB/s 到 300GB/s》《手写 GEMM 逼近 cuBLAS》《Flash Attention 实现笔记》。
-- 面试时甩链接，比口头自述可信得多。
-
-**L3 — 开源贡献（M3 起，含金量陡增，在职者最强背书）**
-- 目标仓库：**PyTorch、Triton、CUTLASS、vLLM、xFormers、Flash-Attention**。
-- 从 `good first issue` / 文档 / 单测 / 小 bug / 性能小优化入手，目标是 **累计 3–5 个 merged PR**，其中至少 1 个是「有分量的性能优化」。
-- 一个 merged PR（哪怕修一个边界 bug 或补一个算子测试）在算子岗简历里是硬通货，远胜一堆自练 demo。
-
-**L4 — 竞赛（你已工作，基本不适用）**
-- ASC/ISC/SC 学生超算竞赛等需在校生身份，跳过；但可了解 MLPerf 的 benchmark 方法论，面试谈资加分。
-
-**L5 — 认证（可选，快速补一块）**
-- NVIDIA Deep Learning Institute（DLI）证书：CUDA C/C++、加速计算课程，花 1–2 天可拿，简历「有官方背书」的速效项。
-
-**L6 — 内推 / 社招（最强，M10 启动）**
-- 在职社招靠**内推 + 作品集**：找目标公司（NVIDIA、字节/阿里/腾讯 AI infra、地平线、燧原、摩尔线程、天数智芯等）的内部员工内推。
-- 有 M1–M9 的作品集 + 开源 PR 再去投，命中率完全不同。
-
-**各月背书行动（与月计划同步推进）：**
-
-| 月 | 本月背书行动 | 目标产出 |
-| --- | --- | --- |
-| M1 | 建 GitHub 仓库、规范 commit、写好 README；报 1 门 DLI 课程 | 公开仓库 + 首个可复现 demo |
-| M2 | 发第 1 篇博客（归约/转置优化）；P1 打 tag + benchmark | 1 篇博客 + P1 数字 |
-| M3 | 发《手写 GEMM》博客；认领 PyTorch/Triton `good first issue` | 1 篇博客 + 首个 issue 认领 |
-| M4 | 首个开源 PR 提交；《Tensor Core/CUTLASS》博客 | 1 个 PR 提交 |
-| M5 | 主攻开源（vLLM/xFormers/PyTorch 算子）；《Flash Attention》博客 | 1 个 PR + 1 篇博客 |
-| M6 | 争取 1–2 个 merged PR；Capstone v1 README + benchmark | 1–2 merged PR + P5 |
-| M7 | 《Hopper TMA/wgmma 实测》博客；持续开源 | 1 篇博客 |
-| M8 | 1 个有分量的性能优化 PR；开源深挖笔记 | 性能 PR |
-| M9 | 系统/数值精度博客；累计 3–5 merged PR | 累计 3–5 PR |
-| M10 | 打磨简历 + 内推启动（NVIDIA 及 AI infra 公司）+ 刷题 | 简历 + 内推渠道 |
-| M11 | 海投 20+ 家、面试复盘、持续开源 | 面试记录 + 复盘 |
-| M12 | offer 决策 / 深化明星项目 | offer 或明确下一步 |
-
-> **一句话：** 学习计划解决「会不会」，背书行动解决「别人信不信」。背书决定你 12 个月后能不能拿到面试和 offer。
+1. **先删「为了完整而完整」的传统 Conv 深挖**，只保留 implicit GEMM 思想。
+2. 再删部分老式 WMMA API 细节，但保留 Tensor Core 数据流和 PTX/SASS 认知。
+3. 2:4 sparsity 降为选修，除非目标 JD 明确要求。
+4. 不删：GEMM、Attention、KV/PagedAttention、torch.compile、CuTe/cuTile、NCCL、vLLM、profiling。
+5. 不为了追赶日期跳过 correctness/benchmark；一个高质量项目 > 五个半成品。
 
 ---
 
-## 八、资源清单
+## 8. 最重要的执行原则
 
-**CUDA 官方（必读，一手资料）：**
-- 《CUDA C++ Programming Guide》（编程模型、内存、异步、特性，M1–M12 常查）
-- 《CUDA C++ Best Practices Guide》（合并访问、occupancy、优化清单，M2–M3 精读）
-- NVIDIA Nsight Compute 文档 / Kernel Profiling Guide（M5–M6）
-- CUTLASS 官方文档与 `examples/`（M4、M8）
+**每个月至少交付一个「别人可以验证」的东西。**
 
-**书籍：**
-- 《Programming Massively Parallel Processors》(PMPP, Hwu et al.) —— 算子开发核心教材，M1–M4 主线
-- 《CUDA C 编程权威指南》（入门可快速过）
+不要写：
 
-**博客/教程：**
-- NVIDIA 开发者博客：`How to Optimize GEMM`、`Matrix Multiplication Background`、`Optimizing Parallel Reduction`、`An Even Easier Introduction to CUDA`
-- Simon Boehm《How to Optimize a CUDA Matmul Kernel for cuBLAS-like Performance》（M3 精读）
-- Lei Mao、Simon Willison、Horace He 的 Triton/算子博客（M5）
+> 「学习了 CUDA、Triton、vLLM。」
 
-**论文（M4–M9 读，理解 idea 而非背）：**
-- Flash Attention 1/2/3（M5、M8）
-- Online Softmax（M4）
-- CUTLASS 论文《CUTLASS: Fast Linear Algebra in CUDA C++》（M4、M8）
-- GPTQ / FP8-LLM / NVIDIA FP8（M6、M9）
+要能写成：
 
----
+> 「在 RTX 4090 上实现并优化 BF16 RMSNorm/Attention kernel；针对指定 batch/seq/head-dim shape 与 PyTorch/Triton baseline 对比，使用 Nsight Compute 定位 memory throughput 与 warp stall，优化后 p50 latency 降低 X%，并通过误差与梯度测试。」
 
-## 九、最终验收标准
+真正决定你能不能进入 AI Kernel / AI Systems 团队的，不是知识点数量，而是你能不能完成：
 
-**第 6 个月 checkpoint 必须能独立做到：**
-1. 不看模板，写出正确、可编译、带错误检查的 CUDA kernel，并用 CPU 参考实现对拍验证。
-2. 给定一个算子，说出其算术强度、用 Roofline 判断「计算受限/访存受限」，给出 ≥2 种优化手段。
-3. 自己写的 GEMM 达到 cuBLAS 同量级（≥50%，理想 ≥80%）。
-4. 把 CUDA kernel 封装成 PyTorch 自定义算子（含反向），模型里可正常训练。
-5. 用 Nsight Compute 定位一个真实瓶颈并消除它。
-
-**第 12 个月最终必须能独立做到：**
-6. 讲清 Hopper 新特性（TMA/wgmma/cluster）的动机与代码结构，并做过实测。
-7. 读懂一段 PTX/SASS，解释数值精度（FP32/BF16/FP8/INT8）对算子结果的影响。
-8. 拥有 3–5 个 merged 开源 PR、一个明星项目、8+ 篇博客。
-9. 像面试一样讲清任意算子的「问题定义 → 并行分解 → 内存访问 → 优化手段 → 性能结果」。
-10. 拿到 NVIDIA 或头部 AI infra 公司的 offer，或进入终面。
-
-**一句话总结：** 12 个月后，你要从「会调 PyTorch API」变成「能写 CUDA Kernel、并有理有据地把它做到快的人」，且这些能力都有公开、可验证的成果背书。
+**问题定义 → correctness → performance model → implementation → profiling → optimization → system integration → reproducible evidence。**
